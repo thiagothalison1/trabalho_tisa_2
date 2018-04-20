@@ -1,90 +1,149 @@
-#include <manifest.h>
-#include <bsdtypes.h>
-#include <in.h>
-#include <socket.h>
-#include <netdb.h>
-#include <stdio.h>
+/*
+    Simple udp server
+*/
+#include<stdio.h> //printf
+#include<string.h> //memset
+#include<stdlib.h> //exit(0);
+#include <unistd.h>
+#include<arpa/inet.h>
+#include<sys/socket.h>
+#include<sys/time.h>
+#include "channelMessageProtocol.h"
 
-main()
-{
-   int s, namelen, client_address_size;
-   struct sockaddr_in client, server;
-   char buf[32];
+#define MAX_SEND_ATTEMPTS 5
+#define BUFLEN 512  //Max length of buffer
+#define PORT 8888   //The port on which to listen for incoming data
 
-   /*
-    * Create a datagram socket in the internet domain and use the
-    * default protocol (UDP).
-    */
-   if ((s = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
-   {
-       tcperror("socket()");
-       exit(1);
-   }
+/**
+ * Global Variables
+ */
+struct sockaddr_in si_me, si_other;
+int s, i, slen = sizeof(si_other) , recv_len;
+char buf[BUFLEN];
+char seqNumber = 0;
 
-   /*
-    * Bind my name to this socket so that clients on the network can
-    * send me messages. (This allows the operating system to demultiplex
-    * messages and get them to the correct server)
-    *
-    * Set up the server name. The internet address is specified as the
-    * wildcard INADDR_ANY so that the server can get messages from any
-    * of the physical internet connections on this host. (Otherwise we
-    * would limit the server to messages from only one network
-    * interface.)
-    */
-   server.sin_family      = AF_INET;  /* Server is in Internet Domain */
-   server.sin_port        = 0;         /* Use any available port      */
-   server.sin_addr.s_addr = INADDR_ANY;/* Server's Internet Address   */
-
-   if (bind(s, (struct sockaddr *)&server, sizeof(server)) < 0)
-   {
-       tcperror("bind()");
-       exit(2);
-   }
-
-   /* Find out what port was really assigned and print it */
-   namelen = sizeof(server);
-   if (getsockname(s, (struct sockaddr *) &server, &namelen) < 0)
-   {
-       tcperror("getsockname()");
-       exit(3);
-   }
-
-   printf("Port assigned is %d\n", ntohs(server.sin_port));
-
-   /*
-    * Receive a message on socket s in buf  of maximum size 32
-    * from a client. Because the last two paramters
-    * are not null, the name of the client will be placed into the
-    * client data structure and the size of the client address will
-    * be placed into client_address_size.
-    */
-   client_address_size = sizeof(client);
-
-   if(recvfrom(s, buf, sizeof(buf), 0, (struct sockaddr *) &client,
-            &client_address_size) <0)
-   {
-       tcperror("recvfrom()");
-       exit(4);
-   }
-   /*
-    * Print the message and the name of the client.
-    * The domain should be the internet domain (AF_INET).
-    * The port is received in network byte order, so we translate it to
-    * host byte order before printing it.
-    * The internet address is received as 32 bits in network byte order
-    * so we use a utility that converts it to a string printed in
-    * dotted decimal format for readability.
-    */
-   printf("Received message %s from domain %s port %d internet\
- address %s\n",
-       buf,
-       (client.sin_family == AF_INET?"AF_INET":"UNKNOWN"),
-       ntohs(client.sin_port),
-       inet_ntoa(client.sin_addr));
-
-   /*
-    * Deallocate the socket.
-    */
-   close(s);
+struct channelMessage * messageInfo;
+ 
+void die(char *s) {
+    perror(s);
+    exit(1);
 }
+
+void disconnect () {
+    close(s);
+}
+
+char generateSeqNumber () {
+    return ++seqNumber % 255;
+}
+
+void createServer () {
+    /* Create an UDP socket */
+    if ((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+    {
+        die("socket");
+    }
+
+    /* zero out the structure */
+    memset((char *) &si_me, 0, sizeof(si_me));
+     
+    si_me.sin_family = AF_INET;
+    si_me.sin_port = htons(PORT);
+    si_me.sin_addr.s_addr = htonl(INADDR_ANY);
+     
+    /* bind socket to port */
+    if( bind(s , (struct sockaddr*)&si_me, sizeof(si_me) ) == -1)
+    {
+        die("bind");
+    }
+
+    struct timeval tv;
+    tv.tv_sec = 3;
+    tv.tv_usec = 0;
+
+    if (setsockopt(s, SOL_SOCKET, SO_RCVTIMEO,&tv,sizeof(tv)) < 0) {
+        die("Set socket timeout");
+    }
+}
+
+int receiveData (struct channelMessage * messageInfo) {
+    /* Try to receive some data, this is a blocking call */
+    if ((recv_len = recvfrom(s, buf, BUFLEN, 0, (struct sockaddr *) &si_other, &slen)) < 0) {
+        /* When timeout occurs */
+        return 0;
+    }
+        
+    parseChannelPackage(buf, messageInfo);
+
+    /* When the message was successfully received */
+    return 1;
+}
+
+void createDataPackage (char message, char * package) {
+    char seqNumber = generateSeqNumber();
+
+    buildChannelPackage(DATA_MSG, seqNumber, message, package);
+}
+
+int dispatch (char * package) {
+    /* Send data to connected client */
+    if (sendto(s, package, recv_len, 0, (struct sockaddr*) &si_other, slen) == -1) {
+        die("sendto()");
+    }
+
+    struct channelMessage response;
+    
+    int receiveStatus = receiveData(&response);
+
+    if (receiveStatus == 1) {
+        if (response.msgType == ACK_MSG) {
+            return 1;
+        }
+        return 0;
+    }
+
+    return 0;
+}
+
+int sendMessage (char message) {
+    char package[CHANNEL_PACKAGE_SIZE];
+
+    createDataPackage(message, package);
+
+    int messageSuccess = 0;
+
+    int sendAttempts = 0;
+
+    while (messageSuccess == 0 && sendAttempts != MAX_SEND_ATTEMPTS) {
+        messageSuccess = dispatch(package);
+        sendAttempts++;
+    }
+    
+    if (sendAttempts == MAX_SEND_ATTEMPTS) {
+        return 0;
+    } else {
+        return 1;
+    }
+}
+
+void waitConnection () {
+    int hasConnection = 0;
+
+    while (!hasConnection) {
+        fflush(stdout);
+        
+        struct channelMessage messageInfo;
+
+        receiveData(&messageInfo);
+
+        if (messageInfo.msgType == CONNECT_MSG) {
+            hasConnection = 1;
+        }
+    }
+}
+
+void startServer () {
+    createServer();
+    waitConnection();
+}
+ 

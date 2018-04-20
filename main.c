@@ -26,7 +26,7 @@ void * produce(void * arg) {
     while (1) {
         int r = rand() % 100;
         if (r >= 40) {
-            insert(r);
+            insert('a');
         }
         alarmClock(producePeriod, &produceCLock);
     }
@@ -40,8 +40,8 @@ void * consume(void * arg) {
     while (1) {
         int r = rand() % 100;
         if (r >= 80) {
-            int i = removeFromList();
-            printf("Removed: %d\n", i);
+            readFromList();
+            printf("Removed");
         }
         alarmClock(consumePeriod, &consumeClock);
     }

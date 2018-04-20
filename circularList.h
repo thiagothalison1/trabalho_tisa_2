@@ -1,3 +1,3 @@
-void insert(int element);
+void insert(char element);
 
-int removeFromList();
+char readFromList();

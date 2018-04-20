@@ -1,11 +1,12 @@
 #include "circularList.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <pthread.h>
 
 #define TAMLIST 10
 
-int data [TAMLIST];
+char data [TAMLIST];
 
 int emptyList = 1;
 int fullList = 0;
@@ -28,8 +29,8 @@ void printList() {
     int listSize = (fullList == 1) ? TAMLIST : (emptyList == 1) ? 0 : calcListSize();
 
     for (int i=0; i < listSize; i++) {
-        int index = (tail + i) % TAMLIST; 
-        printf("%d ", data[index]);
+        int index = (tail + i) % TAMLIST;
+        printf("%c ", data[index]);
     }
 
     printf("    Length: %d", listSize);
@@ -38,13 +39,15 @@ void printList() {
     printf("\n");
 }
 
-void insert(int element) {
+void insert(char element) {
     pthread_mutex_lock(&mutex);
         while (fullList == 1) {
             pthread_cond_wait(&listNotFull, &mutex);
         }
 
         data[head] = element;
+
+        // memcpy(&data[head], element, TAMDATA);
 
         head = ++head % TAMLIST;
         if (head == tail) fullList = 1;
@@ -54,20 +57,19 @@ void insert(int element) {
             pthread_cond_signal(&listNotEmpty);
         }
 
-        printf("Insertion ");
-        printList();
+        // printList();
     pthread_mutex_unlock(&mutex);
 }
 
-int readFromList() {
-    int removedElement;
+char readFromList() {
+    char valueRead;
 
     pthread_mutex_lock(&mutex);
         while (emptyList == 1) {
             pthread_cond_wait(&listNotEmpty, &mutex);
         }
 
-        removedElement = data[tail];
+        valueRead = data[tail];
         tail = ++tail % TAMLIST;
         if (tail == head) emptyList = 1;
 
@@ -76,6 +78,6 @@ int readFromList() {
             pthread_cond_signal(&listNotFull);
         }
     pthread_mutex_unlock(&mutex);
-    
-    return removedElement;
+
+    return valueRead;
 }

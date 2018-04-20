@@ -1,3 +1,3 @@
-void openConnection(char *host, int port);
+void startServer();
 
-void sendMessage(char *message, char *buffer);
+int sendMessage (char message);

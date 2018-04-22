@@ -1,3 +1,8 @@
-void insert(char element);
+struct record {
+ char data;
+ struct timeval * timestamp;
+};
 
-char readFromList();
+void insertRecord(char data, struct timeval * timestamp);
+
+struct record * readRecord(struct record * recordValue);

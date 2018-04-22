@@ -9,6 +9,7 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <pthread.h>
+#include "timestamp.h"
 #include "circularList.h"
 #include "channelMessageProtocol.h"
 
@@ -70,10 +71,13 @@ int recebe(char *buffer) {
 void dispatch(char seqNumber, char messageType, char message) {
     char package[CHANNEL_PACKAGE_SIZE];
 
-    buildChannelPackage(messageType, seqNumber, message, package);
+	struct timeval timeNow;
+	getTime(&timeNow);
+
+    buildChannelPackage(messageType, seqNumber, message, &timeNow, package);
 
 	/* Envia msg ao servidor */
-	if (sendto(socket_local, package, strlen(package)+1, 0, (struct sockaddr *) &endereco_destino, sizeof(endereco_destino)) < 0 ) { 
+	if (sendto(socket_local, package, CHANNEL_PACKAGE_SIZE + 1, 0, (struct sockaddr *) &endereco_destino, sizeof(endereco_destino)) < 0 ) { 
 		perror("sendto");
 		return;
 	}
@@ -97,6 +101,37 @@ void startClient () {
 }
 
 void listenServer () {
+	//fprintf(stdout, "%u\n", (unsigned)time(NULL)); 
+
+	// char buff[20];
+	// struct tm * timeinfo;
+	// timeinfo = localtime(&time(NULL));
+	// strftime(buff, sizeof(buff), "%b %d %H:%M", timeinfo);
+
+	//time_t current_time;
+    //har* c_time_string;
+
+	/* Obtain current time. */
+    //current_time = time(NULL);
+
+	/* Convert to local time format. */
+    // c_time_string = ctime(&current_time);
+
+	// (void) printf("Current time is %s", c_time_string);
+
+	// struct timeval tmnow;
+    // struct tm *tm;
+    // char buf[30], usec_buf[6];
+    // gettimeofday(&tmnow, NULL);
+    // tm = localtime(&tmnow.tv_sec);
+    // strftime(buf,30,"%Y:%m:%dT%H:%M:%S", tm);
+
+	// int milisseconds = (int)tmnow.tv_usec / 1000;
+    // strcat(buf,".");
+    // sprintf(usec_buf,"%dZ",milisseconds);
+    // strcat(buf,usec_buf);
+    // printf("%s",buf);
+
 	while (1) {
 		char serverPackage[CHANNEL_PACKAGE_SIZE];
 
@@ -108,7 +143,7 @@ void listenServer () {
 
 		if (status == 1) {
 			if (serverMessage.seqNumber != last_received_seq_number) {
-				insert(serverMessage.message);
+				insertRecord(serverMessage.message, (struct timeval *) &serverMessage.timestamp);
 				last_received_seq_number = serverMessage.seqNumber;
 			}
 			sendMessage(serverMessage.seqNumber, ACK_MSG, DUMMY_MESSAGE);

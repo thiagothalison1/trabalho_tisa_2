@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
+#include <sys/time.h>
 #include "channelMessageProtocol.h"
 
 /**
@@ -10,7 +12,7 @@ char DISCONNECT_MSG = '0';
 char ACK_MSG = 'a';
 char NACK_MSG = 'n';
 char DATA_MSG = 'd';
-int CHANNEL_PACKAGE_SIZE = 5;
+int CHANNEL_PACKAGE_SIZE = 5 + sizeof(struct timeval);
 
 char DUMMY_SEQ_NUMBER = '0';
 char DUMMY_MESSAGE = '#';
@@ -19,6 +21,7 @@ int MESSAGE_TYPE_INDEX = 0;
 int SEQ_NUMBER_INDEX = 1;
 int CHECKSUM_INDEX = 2;
 int MESSAGE_INDEX = 4;
+int TIMESTAMP_INDEX = 5;
 
 /**
  * Functions
@@ -36,7 +39,7 @@ unsigned short calculateCheckSum(const unsigned char* data_p) {
     return checkSum;
 }
 
-void buildChannelPackage(char messageType, char seqNumber, char message, char * package) {
+void buildChannelPackage(char messageType, char seqNumber, char message, struct timeval * timestamp, char * package) {
     package[MESSAGE_TYPE_INDEX] = messageType;
 
     package[SEQ_NUMBER_INDEX] = seqNumber;
@@ -45,6 +48,8 @@ void buildChannelPackage(char messageType, char seqNumber, char message, char * 
     memset(&package[CHECKSUM_INDEX], 0, 2);
 
     package[MESSAGE_INDEX] = message;
+
+    memcpy(&package[TIMESTAMP_INDEX], timestamp, sizeof(struct timeval));
     
     /* Calculate checksum for entire package and place it at checksum position */
     unsigned short checkSum = calculateCheckSum(package);
@@ -68,7 +73,7 @@ int parseChannelPackage(char * package, struct channelMessage *messageInfo) {
         messageInfo->seqNumber = package[SEQ_NUMBER_INDEX];
         messageInfo->checkSum = expectedChecksum;
         messageInfo->message = package[MESSAGE_INDEX];
-
+        memcpy(&messageInfo->timestamp, &package[TIMESTAMP_INDEX], sizeof(struct timeval));
         return 1;
     }
 }

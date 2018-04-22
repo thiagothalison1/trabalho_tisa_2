@@ -12,10 +12,11 @@ struct channelMessage {
     char seqNumber;
     unsigned short checkSum;
     char message;
+    struct timeval * timestamp;
 };
 
 unsigned short calculateCheckSum(const unsigned char* data_p);
 
-void buildChannelPackage(char messageType, char seqNumber, char message, char * package);
+void buildChannelPackage(char messageType, char seqNumber, char message, struct timeval * timestamp, char * package);
 
 int parseChannelPackage(char * package, struct channelMessage *messageInfo);

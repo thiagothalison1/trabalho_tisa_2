@@ -11,7 +11,6 @@
 #include "channelMessageProtocol.h"
 
 #define MAX_SEND_ATTEMPTS 5
-#define BUFLEN 512  //Max length of buffer
 #define PORT 8888   //The port on which to listen for incoming data
 
 /**
@@ -19,7 +18,6 @@
  */
 struct sockaddr_in si_me, si_other;
 int s, i, slen = sizeof(si_other) , recv_len;
-char buf[BUFLEN];
 char seqNumber = 0;
 
 struct channelMessage * messageInfo;
@@ -67,8 +65,9 @@ void createServer () {
 }
 
 int receiveData (struct channelMessage * messageInfo) {
+    char buf[CHANNEL_PACKAGE_SIZE];
     /* Try to receive some data, this is a blocking call */
-    if ((recv_len = recvfrom(s, buf, BUFLEN, 0, (struct sockaddr *) &si_other, &slen)) < 0) {
+    if ((recv_len = recvfrom(s, buf, CHANNEL_PACKAGE_SIZE + 1, 0, (struct sockaddr *) &si_other, &slen)) < 0) {
         /* When timeout occurs */
         return 0;
     }
@@ -79,10 +78,10 @@ int receiveData (struct channelMessage * messageInfo) {
     return 1;
 }
 
-void createDataPackage (char message, char * package) {
+void createDataPackage (char message, struct timeval * timeNow, char * package) {
     char seqNumber = generateSeqNumber();
 
-    buildChannelPackage(DATA_MSG, seqNumber, message, package);
+    buildChannelPackage(DATA_MSG, seqNumber, message, timeNow, package);
 }
 
 int dispatch (char * package) {
@@ -105,10 +104,10 @@ int dispatch (char * package) {
     return 0;
 }
 
-int sendMessage (char message) {
+int sendMessage (char message, struct timeval * timeNow) {
     char package[CHANNEL_PACKAGE_SIZE];
 
-    createDataPackage(message, package);
+    createDataPackage(message, timeNow, package);
 
     int messageSuccess = 0;
 
@@ -134,10 +133,12 @@ void waitConnection () {
         
         struct channelMessage messageInfo;
 
-        receiveData(&messageInfo);
+        int result = receiveData(&messageInfo);
 
-        if (messageInfo.msgType == CONNECT_MSG) {
-            hasConnection = 1;
+        if (result == 1) {
+            if (messageInfo.msgType == CONNECT_MSG) {
+                hasConnection = 1;
+            }
         }
     }
 }

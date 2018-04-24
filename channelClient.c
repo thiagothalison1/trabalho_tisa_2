@@ -13,138 +13,145 @@
 #include "circularList.h"
 #include "channelMessageProtocol.h"
 
-#define FALHA 1
+/*** Constants ***/
 
-/**
- * Global Variables
- */
-int socket_local;
-char last_received_seq_number = (char) 255;
-struct sockaddr_in endereco_destino;
+#define FALHA_ENDERECO_DE_REDE 1 // Utilizado como identificador de falhas na criação de socket com o servidor de dados.
+
+/*** Global Variables ***/
+
+int localSocket; // Armazena o identificador do socket com o servidor.
+char lastReceivedSeqNumber = (char) 255; // Armazena o número do último número de sequência de pacote recebido.
+struct sockaddr_in serverAddress; // Armazena os dados referentes ao endereço do servidor.
 pthread_mutex_t socket_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-int cria_socket_local(void) {
-	socket_local = socket( PF_INET, SOCK_DGRAM, 0);
-	if (socket_local < 0) {
+/*** Functions ***/
+
+/**
+* Esta função é responsável pela criação do socket de comunicação com o servidor.
+*/
+int createServerSocket(void) {
+	localSocket = socket( PF_INET, SOCK_DGRAM, 0);
+	if (localSocket < 0) {
 		perror("socket");
 		return 1;
 	}
 	return 0;
 }
 
-struct sockaddr_in cria_endereco_destino(char *destino, int porta_destino) {
-	struct sockaddr_in servidor; 	/* Endereço do servidor incluindo ip e porta */
-	struct hostent *dest_internet;	/* Endereço destino em formato próprio */
-	struct in_addr dest_ip;		    /* Endereço destino em formato ip numérico */
+/**
+* Esta função é responsável pela criação de uma estrutura de dados que armazena as informações 
+* referentes ao endereço do servidor endereço e porta.
+* Parâmetros: char data: dado
+*             struct timeval * timestamp: dados de tempo da mensagem
+*/
+struct sockaddr_in createServerAddress(char *address, int port) {
+	struct sockaddr_in servidor; 	// Endereço do servidor incluindo ip e porta
+	struct hostent *dest_internet;	// Endereço destino em formato próprio
+	struct in_addr dest_ip;		    // Endereço destino em formato ip numérico
 
-	if (inet_aton ( destino, &dest_ip ))
+	if (inet_aton(address, &dest_ip))
 		dest_internet = gethostbyaddr((char *)&dest_ip, sizeof(dest_ip), AF_INET);
 	else
-		dest_internet = gethostbyname(destino);
+		dest_internet = gethostbyname(address);
 
 	if (dest_internet == NULL) {
 		fprintf(stderr,"Endereço de rede inválido\n");
-		exit(FALHA);
+		exit(FALHA_ENDERECO_DE_REDE);
 	}
 
 	memset((char *) &servidor, 0, sizeof(servidor));
 	memcpy(&servidor.sin_addr, dest_internet->h_addr_list[0], sizeof(servidor.sin_addr));
 	servidor.sin_family = AF_INET;
-	servidor.sin_port = htons(porta_destino);
+	servidor.sin_port = htons(port);
 
 	return servidor;
 }
 
-int recebe(char *buffer) {
-	int bytes_recebidos;		/* Número de bytes recebidos */
+/**
+* Esta função é responsável pela criação de uma estrutura de dados que armazena as informações 
+* referentes ao endereço do servidor endereço e porta.
+* Parâmetros: char buffer: buffer para armazenamento de dados recebidos do servidor.
+*/
+int receiveData(char *buffer) {
+	int receivedBytes; // Número de bytes recebidos
 
-	/* Espera pela msg de resposta do servidor */
-	bytes_recebidos = recvfrom(socket_local, buffer, CHANNEL_PACKAGE_SIZE, 0, NULL, 0);
-	if (bytes_recebidos < 0)
+	// Espera por alguma mensagem do servidor.
+	receivedBytes = recvfrom(localSocket, buffer, CHANNEL_PACKAGE_SIZE, 0, NULL, 0);
+	if (receivedBytes < 0)
 	{
 		perror("recvfrom");
 	}
 
-	return bytes_recebidos;
+	return receivedBytes;
 }
 
-void dispatch(char seqNumber, char messageType, char message) {
-    char package[CHANNEL_PACKAGE_SIZE];
+/**
+* Esta função é responsável pelo envio de pacotes para o servidor.
+* Parâmetros: char seqNumber: Número do pacote a ser envidado.
+*             char messageType: Tipo de mensagem a ser enviada. Neste caso mensagem de dados.
+*			  char message: A mensagem a ser enviada.
+*/
+void sendMessage(char seqNumber, char messageType, char message) {
+	char package[CHANNEL_PACKAGE_SIZE];
 
+	// Recupera o horário local para utilizar como timestamp da mensagem.
 	struct timeval timeNow;
 	getTime(&timeNow);
 
+	// Coloca as informações referentes ao pacote no buffer (package)
     buildChannelPackage(messageType, seqNumber, message, &timeNow, package);
 
-	/* Envia msg ao servidor */
-	if (sendto(socket_local, package, CHANNEL_PACKAGE_SIZE + 1, 0, (struct sockaddr *) &endereco_destino, sizeof(endereco_destino)) < 0 ) { 
+	// Envia o pacote para o servidor
+	if (sendto(localSocket, package, CHANNEL_PACKAGE_SIZE + 1, 0, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0 ) { 
 		perror("sendto");
 		return;
 	}
 }
 
-void sendMessage(char seqNumber, char messageType, char message) {
-	dispatch(seqNumber, messageType, message);
-}
-
+/**
+* Esta função é responsável pelo setUp da comunicação com o servidor.
+* Ela chama uma função que cria o socket de comunicação e outra que configura o endereço de envio dos dados.
+* Parâmetros: char host: Endereço do servidor.
+*             int port: Porta do servidor.
+*/
 void openConnection(char *host, int port) {
-	cria_socket_local();
-	endereco_destino = cria_endereco_destino(host, port);
+	createServerSocket();
+	serverAddress = createServerAddress(host, port);
 }
 
+/**
+* Esta função é responsável por iniciar a comunicação com o servidor. Para tal ela abre a comunicação
+* e envia uma mensagem de abertura de conexão. 
+* A mensagem de abertura de conexão não tem dadados e nem número de sequência na primeira versão do channel.
+*/
 void startClient () {
 	char *host = "localhost";
 	int port = 8888;
-	openConnection(host, port);
 
+	openConnection(host, port);
 	sendMessage(DUMMY_SEQ_NUMBER, CONNECT_MSG, DUMMY_MESSAGE);
 }
 
+/**
+* Esta função implementa um loop que fica constantemente "escutando" por mensagens do servidor.
+* Ela controla o número de sequência das mensagens para decidir se manda um ACK ou NACK para o servidor.
+* Em caso de mensagens corrompidas, a função parseChannelPackage retorna 0, o que também causa o envio de um NACK
+* para o servidor.
+*/
 void listenServer () {
-	//fprintf(stdout, "%u\n", (unsigned)time(NULL)); 
-
-	// char buff[20];
-	// struct tm * timeinfo;
-	// timeinfo = localtime(&time(NULL));
-	// strftime(buff, sizeof(buff), "%b %d %H:%M", timeinfo);
-
-	//time_t current_time;
-    //har* c_time_string;
-
-	/* Obtain current time. */
-    //current_time = time(NULL);
-
-	/* Convert to local time format. */
-    // c_time_string = ctime(&current_time);
-
-	// (void) printf("Current time is %s", c_time_string);
-
-	// struct timeval tmnow;
-    // struct tm *tm;
-    // char buf[30], usec_buf[6];
-    // gettimeofday(&tmnow, NULL);
-    // tm = localtime(&tmnow.tv_sec);
-    // strftime(buf,30,"%Y:%m:%dT%H:%M:%S", tm);
-
-	// int milisseconds = (int)tmnow.tv_usec / 1000;
-    // strcat(buf,".");
-    // sprintf(usec_buf,"%dZ",milisseconds);
-    // strcat(buf,usec_buf);
-    // printf("%s",buf);
-
 	while (1) {
-		char serverPackage[CHANNEL_PACKAGE_SIZE];
+		char serverPackage[CHANNEL_PACKAGE_SIZE]; // Buffer para pacotes recebidos do servidor.
 
-		recebe(serverPackage);
+		receiveData(serverPackage);	// Aguarda por mensagens do servidor.
 
-		struct channelMessage serverMessage;
+		struct channelMessage serverMessage; // Estrutura de dados que armazena os dados das mensagens do servidor.
 
-		int status = parseChannelPackage(serverPackage, &serverMessage);
-
+		int status = parseChannelPackage(serverPackage, &serverMessage); // Coloca os dados recebidos na estrutura de dados.
+		
 		if (status == 1) {
-			if (serverMessage.seqNumber != last_received_seq_number) {
+			if (serverMessage.seqNumber != lastReceivedSeqNumber) {
 				insertRecord(serverMessage.message, (struct timeval *) &serverMessage.timestamp);
-				last_received_seq_number = serverMessage.seqNumber;
+				lastReceivedSeqNumber = serverMessage.seqNumber;
 			}
 			sendMessage(serverMessage.seqNumber, ACK_MSG, DUMMY_MESSAGE);
 		} else {

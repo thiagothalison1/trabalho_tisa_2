@@ -1,3 +1,9 @@
+/************************************************************************************************
+* Esta interface implementa o protocolo de comunicação entre cliente e servidor. A função 
+* buildChannelPackage é utilizada para montagem de mensagens e a função parseChannelPackage para
+* interpretação de mensagens. É neste nível do programa que o checksum é verificado para detecção
+* de pacotes de dados corrompidos.
+*************************************************************************************************/
 extern char CONNECT_MSG;
 extern char DISCONNECT_MSG;
 extern char ACK_MSG;

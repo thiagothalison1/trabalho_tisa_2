@@ -66,16 +66,19 @@ void createServer () {
 
 int receiveData (struct channelMessage * messageInfo) {
     char buf[CHANNEL_PACKAGE_SIZE];
-    /* Try to receive some data, this is a blocking call */
+    
+    // Fica esperando mensagens de retorno do cliente.
     if ((recv_len = recvfrom(s, buf, CHANNEL_PACKAGE_SIZE + 1, 0, (struct sockaddr *) &si_other, &slen)) < 0) {
-        /* When timeout occurs */
+        // Se ocorrer timeout (espera maior que 3 segundos), então funcção retorna false. 
         return 0;
     }
         
-    parseChannelPackage(buf, messageInfo);
+    // Caso alguma mensagem seja recebida, o parser de mensagem é executado e o retorno do parser será o retorno da função.
+    // O parser retorna true se o checksum está ok e falso se existe alguma falha de checksum.
+    int parserResult =  parseChannelPackage(buf, messageInfo);
 
-    /* When the message was successfully received */
-    return 1;
+    return parserResult;
+
 }
 
 void createDataPackage (char message, struct timeval * timeNow, char * package) {
@@ -113,9 +116,13 @@ int sendMessage (char message, struct timeval * timeNow) {
 
     int sendAttempts = 0;
 
+    // A função tenta enviar o pacote de dados até um máximo de 5 vezes.
+    // Se em 5 tentativas um pacote de ACK (Não Corrompido) não for recebido,
+    // então a função retorna false e para de tentar reenviar o pacote. 
     while (messageSuccess == 0 && sendAttempts != MAX_SEND_ATTEMPTS) {
         messageSuccess = dispatch(package);
         sendAttempts++;
+        printf("Attempt: %d\n", sendAttempts);
     }
     
     if (sendAttempts == MAX_SEND_ATTEMPTS) {

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <pthread.h>
 #include "timestamp.h"
 #include "channelServer.h"
@@ -55,9 +56,11 @@ void * serialRead(void * arg) {
     char buf[256];
 
     while(1){
-        fd = serialport_init(serialport, baudrate);
-        serialport_read_until(fd, buf, '\n');
+        //fd = serialport_init(serialport, baudrate);
+        //serialport_read_until(fd, buf, '\n');
         //printf("read: %s\n", buf);
+
+        buf[0] = 'i';
 
         struct timeval timestamp;
         getTime(&timestamp);
@@ -82,7 +85,8 @@ void * messageSender(void * arg) {
         int result = sendMessage(recordValue.data, (struct timeval *) &recordValue.timestamp);
 
         if (result == 0) {
-            puts("Message send failure.");
+            puts("Message send failure. Client is probably disconnected");
+            exit(0);
         } else {
             // puts("Send success."); Não apagar.
         }
@@ -102,12 +106,4 @@ int main(int argc, char *argv[])
     pthread_join(serialReadController, NULL);
     pthread_join(messageSenderController, NULL);
     pthread_join(logGenerator, NULL);
-
-    //int result = sendMessage('o');
-
-    //if (result == 0) {
-    //    puts("Message send failure.");
-    //} else {
-    //    puts("Send success.");
-    //}
 }

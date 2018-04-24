@@ -4,14 +4,14 @@
 #include <sys/time.h>
 #include "channelMessageProtocol.h"
 
-/**
- * Constants
- */
+/* Constants */
+
 char CONNECT_MSG = '1';
 char DISCONNECT_MSG = '0';
 char ACK_MSG = 'a';
 char NACK_MSG = 'n';
 char DATA_MSG = 'd';
+
 int CHANNEL_PACKAGE_SIZE = 5 + sizeof(struct timeval);
 
 char DUMMY_SEQ_NUMBER = '0';
@@ -23,8 +23,11 @@ int CHECKSUM_INDEX = 2;
 int MESSAGE_INDEX = 4;
 int TIMESTAMP_INDEX = 5;
 
+/* Functions */
+
 /**
- * Functions
+ * Função responsável pelo cálculo do checksum.
+ * Parâmetros: char * data_p: Ponteiro para o pacote de dados a ser enviado.
  */
 unsigned short calculateCheckSum(const unsigned char* data_p) {
     unsigned char length = CHANNEL_PACKAGE_SIZE;
@@ -36,36 +39,47 @@ unsigned short calculateCheckSum(const unsigned char* data_p) {
         x ^= x >> 4;
         checkSum = (checkSum << 8) ^ ((unsigned short)(x << 12)) ^ ((unsigned short)(x <<5)) ^ ((unsigned short)x);
     }
+
     return checkSum;
 }
 
+/**
+ * Função responsável por criar os pacotes de comunicação.
+ * Parâmetros: char messageType: Tipo de mensagem a ser enviada.
+ *             char seqNumber: Número de sequência da mensagem a ser enviada.
+ *             char message: Mensagem a ser enviada.
+ *             struct timeval * timestamp: Data da mensagem a ser enviada.
+ *             char * package: Buffer para armazenar dados para envio.
+ */
 void buildChannelPackage(char messageType, char seqNumber, char message, struct timeval * timestamp, char * package) {
     package[MESSAGE_TYPE_INDEX] = messageType;
 
     package[SEQ_NUMBER_INDEX] = seqNumber;
 
-    /* Fill out checksum position with zeroes */
+    // Preenche a posição do checksum com zeros para o cálculo
     memset(&package[CHECKSUM_INDEX], 0, 2);
 
     package[MESSAGE_INDEX] = message;
 
     memcpy(&package[TIMESTAMP_INDEX], timestamp, sizeof(struct timeval));
     
-    /* Calculate checksum for entire package and place it at checksum position */
+    // Calcula o checksum referente aos dados do pacote e armazena na posição referente ao checksum
     unsigned short checkSum = calculateCheckSum(package);
     memcpy(&package[CHECKSUM_INDEX], &checkSum, 2);
 }
 
 int parseChannelPackage(char * package, struct channelMessage *messageInfo) {
-    /* Store expected checksum */
+    // Armazena o valor do checksum em uma variável.
     unsigned short expectedChecksum;
     memcpy((unsigned short *) &expectedChecksum, &package[CHECKSUM_INDEX], 2);
 
-    /* Fill out checksum position with zeroes for checksum calculation */
+    // Preenche a posição do checksum no buffer de dados recebidos com zeros para efetuar o mesmo cálculo 
+    // que fora realizado no build.
     memset(&package[CHECKSUM_INDEX], 0, 2);
 
     unsigned short currentChecksum = calculateCheckSum(package);
 
+    // Caso o checksum calculado seja igual ao esperado (recebido na mensagem) , então a mensagem é considerada ok.
     if (expectedChecksum != currentChecksum) {
         return 0;
     } else {

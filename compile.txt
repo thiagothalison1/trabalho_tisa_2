@@ -1,3 +1,3 @@
-client: gcc client.c channelClient.c channelMessageProtocol.c circularList.c -o client -g -lpthread
+client: gcc clientProgram.c channelClient.c channelMessageProtocol.c circularList.c bufferControl.c timestamp.c -o client -g -lpthread
 
-server: gcc serverProgram.c channelServer.c channelMessageProtocol.c serialReader.c circularList.c -o server -g -lpthread
+server: gcc serverProgram.c channelServer.c channelMessageProtocol.c serialReader.c circularList.c bufferControl.c timestamp.c -o server -g -lpthread

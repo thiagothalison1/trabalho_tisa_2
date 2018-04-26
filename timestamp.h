@@ -1,3 +1,7 @@
+/************************************************************************************************
+* Esta interface é utilizada em serverProgram.c  e clienteProgram.c para o cálculo e 
+* apresentação do timestamp das mensagens.
+*************************************************************************************************/
 #include <time.h>
 #include <sys/time.h>
 

@@ -101,6 +101,9 @@ void sendMessage(char seqNumber, char messageType, char message) {
 	// Coloca as informações referentes ao pacote no buffer (package)
     buildChannelPackage(messageType, seqNumber, message, &timeNow, package);
 
+	//FALHA 2 - QUESTÃO 4
+	// if (messageType == ACK_MSG) package[4] = 'z';
+
 	// Envia o pacote para o servidor
 	if (sendto(localSocket, package, CHANNEL_PACKAGE_SIZE + 1, 0, (struct sockaddr *) &serverAddress, sizeof(serverAddress)) < 0 ) { 
 		perror("sendto");
@@ -139,6 +142,7 @@ void startClient () {
 * para o servidor.
 */
 void listenServer () {
+	//FALHA 4 - PERGUNTA 8, 9 MATAR PROCESSO DO CLIENTE.
 	while (1) {
 		char serverPackage[CHANNEL_PACKAGE_SIZE]; // Buffer para pacotes recebidos do servidor.
 
@@ -148,6 +152,9 @@ void listenServer () {
 
 		int status = parseChannelPackage(serverPackage, &serverMessage); // Coloca os dados recebidos na estrutura de dados.
 		
+		// FALHA 1 - PERGUNTA 3 
+		// sendMessage(serverMessage.seqNumber, NACK_MSG, DUMMY_MESSAGE);
+
 		if (status == 1) {
 			if (serverMessage.seqNumber != lastReceivedSeqNumber) {
 				insertRecord(serverMessage.message, (struct timeval *) &serverMessage.timestamp);

@@ -1,30 +1,40 @@
-#include <stdio.h>    /* Standard input/output definitions */
+#include <stdio.h>    
 #include <stdlib.h> 
-#include <stdint.h>   /* Standard types */
-#include <string.h>   /* String function definitions */
-#include <unistd.h>   /* UNIX standard function definitions */
-#include <fcntl.h>    /* File control definitions */
-#include <errno.h>    /* Error number definitions */
-#include <termios.h>  /* POSIX terminal control definitions */
+#include <stdint.h>   
+#include <string.h>   
+#include <unistd.h>   
+#include <fcntl.h>    
+#include <errno.h>    
+#include <termios.h>  
 #include <sys/ioctl.h>
 #include <getopt.h>
 #include <time.h>
 #include "serialReader.h"
 
-#define NSEC_PER_SEC (1000000000) /* The number of nsecs per sec. */
+/* Constants */
 
-int serialport_init(const char* serialport, int baud);
-int serialport_writebyte(int fd, uint8_t b);
-int serialport_write(int fd, const char* str);
-int serialport_read_until(int fd, char* buf, char until);
+#define NSEC_PER_SEC (1000000000) //Número de nanosegundos por segundo.
 
-int serialport_writebyte( int fd, uint8_t b){
+/* Functions */
+
+/**
+ * Função responsável pela escrita de bytes na porta serial.
+ * Parâmetros: int fd: Descritor de arquivo de comunicação com a porta serial.
+ *             uint8_t b: byte a ser escrito..
+ */ 
+int serialPortWriteByte(int fd, uint8_t b){
     int n = write(fd,&b,1);
     if( n!=1)
         return -1;
     return 0;
 }
-int serialport_write(int fd, const char* str) {
+
+/**
+ * Função responsável pela escrita de textos na porta serial.
+ * Parâmetros: int fd: Descritor de arquivo de comunicação com a porta serial.
+ *             const char* str: Texto a ser escrito na porta serial.
+ */ 
+int serialPortWrite(int fd, const char* str) {
     int len = strlen(str);
     int n = write(fd, str, len);
     if( n!=len ) 
@@ -32,7 +42,13 @@ int serialport_write(int fd, const char* str) {
     return 0;
 }
 
-int serialport_read_until(int fd, char* buf, char until) {
+/**
+ * Lê bytes recebidos na porta serial até um certo número de bytes.
+ * Parâmetros: int fd: Descritor de arquivo de comunicação com a porta serial.
+ *             char* buf: Buffer no qual os dados recebidos na serial são gravados.
+ *             char until: Número de bytes a serem lidos.
+ */ 
+int serialPortReadUntil(int fd, char* buf, char until) {
     int infoReaderPeriod = 100;
     struct timespec infoReaderClock;
     clock_gettime(CLOCK_MONOTONIC ,&infoReaderClock);
@@ -69,32 +85,17 @@ int serialport_read_until(int fd, char* buf, char until) {
 
        return 0;
     }
-    
-int serialport_init(const char* serialport, int baud){
+
+/**
+ * Inicia a porta serial.
+ * Parâmetros: const char* serialport: identificador da porta serial.
+ */    
+int serialPortInit(const char* serialport) {
     int fd;
        
     fd = open(serialport, O_RDONLY);
     if (fd == -1)  {
-        perror("init_serialport: Unable to open port ");
+        perror("Não foi possível abrir a porta serial");
         return -1;
     } 
 }
-
-// int main(int argc, char *argv[]) {
-//     int readerPeriod = 1000;
-//     struct timespec readerClock;
-//     clock_gettime(CLOCK_MONOTONIC ,&readerClock);
-    
-//     int fd = 0;
-//     char serialport[256] = {"/dev/ttyACM0"};
-//     int baudrate = B9600;  // default
-//     char buf[256];
-
-//     while(1){
-//         fd = serialport_init(serialport, baudrate);
-//         serialport_read_until(fd, buf, '\n');
-//         printf("read: %s\n", buf);
-//         insert(buf[0]);
-//         alarmClock(readerPeriod, &readerClock);
-//     }
-// }

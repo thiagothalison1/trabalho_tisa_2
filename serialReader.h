@@ -1,3 +1,7 @@
-int serialport_init(const char* serialport, int baud);
+/************************************************************************************************
+* Esta interface é utilizada em serverProgram.c para a comunicação com o arduino via
+* porta serial.
+*************************************************************************************************/
+int serialPortInit(const char* serialport);
 
-int serialport_read_until(int fd, char* buf, char until);
+int serialPortReadUntil(int fd, char* buf, char until);

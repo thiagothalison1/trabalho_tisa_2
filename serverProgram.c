@@ -80,10 +80,10 @@ void * serialRead(void * arg) {
     char buf[256];
 
     while(1){
-        //fd = serialPortInit(serialport);
+        fd = serialPortInit(serialport);
 
         // Lê o próximo valor enviado pelo arduino.
-        // serialPortReadUntil(fd, buf, '\n');
+        serialPortReadUntil(fd, buf, '\n');
         // printf("read: %s\n", buf);
 
         // Recupera o timestamp atual.
@@ -91,7 +91,7 @@ void * serialRead(void * arg) {
         getTime(&timestamp);
         
         // Grava o valor obtido + timestamp na lista circular.
-        buf[0] = 'i';
+        // buf[0] = 'i';
         insertRecord(buf[0], &timestamp);
         // Grava o valor obtido + timestamp no buffer duplo.
         insertValue(buf[0], &timestamp);
